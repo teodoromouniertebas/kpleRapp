@@ -5,8 +5,9 @@ account: teodoromouniertebas
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 15155638
-bundleId: 10720489
+bundleId: 10720729
 url: https://teodoromouniertebas.shinyapps.io/kpleRapp/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: data/raw_product.csv

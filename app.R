@@ -46,14 +46,16 @@ server <- function(input, output, session) {
   unmatched_data <- reactiveVal()
   file_error <- reactiveVal(NULL)
 
-  observeEvent(input$raw_file, {
-    req(input$raw_file)
+observeEvent(input$raw_file, {
+  req(input$raw_file)
 
+  withProgress(message = "Processing file...", value = 0, {
     tryCatch({
+      incProgress(0.1, detail = "Reading CSV...")
       raw <- read_csv(input$raw_file$datapath)
 
       if (!all(c("raw_product") %in% colnames(raw))) {
-        file_error("Invalid file format: required columns 'raw_product' not found.")
+        file_error("Invalid file format: required column 'raw_product' not found.")
         raw_data(NULL)
         cleaned_data(NULL)
         likely_valid_data(NULL)
@@ -63,71 +65,71 @@ server <- function(input, output, session) {
 
       file_error(NULL)
       raw_data(raw)
-      
-      # clean alias product and raw product
+
+      incProgress(0.2, detail = "Cleaning alias table...")
       alias_product_c <- alias_product |> 
         mutate(
-        alias_id = as.character(alias_id),
-        provider_id = as.character(provider_id),
-        product_id = as.character(product_id)) |> 
+          alias_id = as.character(alias_id),
+          provider_id = as.character(provider_id),
+          product_id = as.character(product_id)
+        ) |> 
         select(alias_id, alias, mapped_product, product_id) |> 
         distinct()
-      
+
+      incProgress(0.3, detail = "Preparing raw products...")
       raw_product_c <- raw |> 
         filter(!is.na(raw_product)) |> 
         distinct() |> 
         mutate(provider_id = as.character(provider_id)) |> 
         arrange(raw_product)
-      
-      
-      # mapped products
-      mapped_products <- raw_product_c |> left_join(alias_product_c, 
-                             by = c("raw_product" = "alias")) |> 
+
+      incProgress(0.5, detail = "Joining mapped products...")
+      mapped_products <- raw_product_c |> 
+        left_join(alias_product_c, by = c("raw_product" = "alias")) |> 
         filter(!is.na(mapped_product))
 
-      # unmapped products
-      unmapped <- raw_product_c |> left_join(alias_product_c, 
-                             by = c("raw_product" = "alias")) |> 
+      incProgress(0.6, detail = "Finding unmapped products...")
+      unmapped <- raw_product_c |> 
+        left_join(alias_product_c, by = c("raw_product" = "alias")) |> 
         filter(is.na(mapped_product))
-      
-      # categorize unmapped products in likely valid products
-      likely_valid_products <- unmapped |>
-        select(raw_product, provider_id) |>
+
+      incProgress(0.75, detail = "Running fuzzy match...")
+      likely_valid_products <- unmapped |> 
+        select(raw_product, provider_id) |> 
         stringdist_left_join(
           alias_product_c, 
           by = c("raw_product" = "alias"), 
           method = "jw",
           max_dist = 0.2,
           distance_col = "distance") |> 
-        arrange(raw_product, distance) |>
-        group_by(raw_product, provider_id) |>
+        arrange(raw_product, distance) |> 
+        group_by(raw_product, provider_id) |> 
         slice(1) |> 
-        ungroup() |>
+        ungroup() |> 
         filter(!is.na(mapped_product)) |> 
         select(raw_product, alias, mapped_product, distance)
 
-        # unmapped products
-      unmapped_products <- unmapped |>
-        select(raw_product, provider_id) |>
+      incProgress(0.9, detail = "Filtering truly unmatched products...")
+      unmapped_products <- unmapped |> 
+        select(raw_product, provider_id) |> 
         stringdist_left_join(
           alias_product_c, 
           by = c("raw_product" = "alias"), 
           method = "jw",
           max_dist = 0.2,
           distance_col = "distance") |> 
-        arrange(raw_product, distance) |>
-        group_by(raw_product, provider_id) |>
-        slice(1) |>
-        ungroup() |>
-        filter(is.na(mapped_product)) |>
+        arrange(raw_product, distance) |> 
+        group_by(raw_product, provider_id) |> 
+        slice(1) |> 
+        ungroup() |> 
+        filter(is.na(mapped_product)) |> 
         select(raw_product, alias, mapped_product)
-        
-      
+
+      incProgress(1, detail = "Finalizing...")
       cleaned_data(mapped_products)
       likely_valid_data(likely_valid_products)
       unmatched_data(unmapped_products)
 
-      
     }, error = function(e) {
       file_error("Error reading CSV file. Please check the file format.")
       raw_data(NULL)
@@ -136,6 +138,8 @@ server <- function(input, output, session) {
       unmatched_data(NULL)
     })
   })
+})
+  
 
   output$file_warning <- renderUI({
     if (!is.null(file_error())) {
@@ -157,15 +161,17 @@ server <- function(input, output, session) {
       class = 'cell-border stripe',
       selection = "none",
       filter = "top",
-      editable = list(target = "row", disable = list(columns = c(3, 4, 5))), 
-      rownames = FALSE) |>
+      editable = list(target = "cell", disable = list(columns = c(3, 4, 5))), 
+      rownames = FALSE)|>
       formatStyle('raw_product',  color = '#FF5349', fontWeight = 'bold')
   })
   
   observeEvent(input$likely_table_cell_edit, {
     info <- input$likely_table_cell_edit
     df <- likely_valid_data()
-    df[info$row, info$col] <- info$value
+    row <- info$row
+    col <- info$col + 1
+    df[row, col] <- DT::coerceValue(info$value, df[row, col])
     likely_valid_data(df)
   })
     
@@ -175,9 +181,18 @@ server <- function(input, output, session) {
       class = 'cell-border stripe',
       selection = "none",
       filter = "top",
-      editable = list(target = "row", disable = list(columns = c(3, 4))), 
+      editable = list(target = "cell", disable = list(columns = c(3, 4))), 
       rownames = FALSE) |>
       formatStyle('raw_product',  color = '#FF5349', fontWeight = 'bold')
+  })
+  
+  observeEvent(input$unmatched_table_cell_edit, {
+    info <- input$unmatched_table_cell_edit
+    df <- unmatched_data()
+    row <- info$row
+    col <- info$col + 1
+    df[row, col] <- DT::coerceValue(info$value, df[row, col])
+    unmatched_data(df)
   })
   
 
@@ -205,5 +220,6 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
+
 
 
