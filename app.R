@@ -6,7 +6,7 @@ library(stringdist)
 library(fuzzyjoin)
 library(bslib)
 
-# Load alias mapping file (preloaded on app startup)
+# Load alias mapping file
 alias_product <- read_csv("data/product_alias.csv")
 
 ui <- page_sidebar(
@@ -52,7 +52,6 @@ server <- function(input, output, session) {
     tryCatch({
       raw <- read_csv(input$raw_file$datapath)
 
-      # Validate structure: must have 'raw_product' and 'provider_id' columns
       if (!all(c("raw_product") %in% colnames(raw))) {
         file_error("Invalid file format: required columns 'raw_product' not found.")
         raw_data(NULL)
