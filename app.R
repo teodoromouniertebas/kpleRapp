@@ -6,7 +6,7 @@ library(stringdist)
 library(fuzzyjoin)
 library(bslib)
 
-# Load alias mapping file
+
 alias_product <- read_csv("data/product_alias.csv")
 
 ui <- page_sidebar(
@@ -31,7 +31,6 @@ ui <- page_sidebar(
     downloadButton("download_unmatched", "Download unmapped products", class = "btn-light")
   ),
 
-  # Contenu principal
   navs_tab_card(
     nav_panel("Mapped products", DTOutput("cleaned_table")),
     nav_panel("Fuzzy join products", DTOutput("likely_table")),
