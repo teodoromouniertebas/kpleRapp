@@ -19,17 +19,31 @@ ui <- page_sidebar(
   ),
   title = "Kpler Product Normalization Tool",
   
-  sidebar =
-    list(
-    fileInput("raw_file", "Upload 'raw_product.csv' file", accept = ".csv"),
-    uiOutput("file_warning"),
-    tags$hr(),
-    downloadButton("download_cleaned", "Download mapped products", class = "btn-light"),
-    br(),
-    downloadButton("download_likely_valid", "Download fuzzyjoin products", class = "btn-light"),
-    br(),
-    downloadButton("download_unmatched", "Download unmapped products", class = "btn-light")
+sidebar = list(
+  # App purpose explanation using bslib card
+  card(
+    card_header("About This Tool"),
+    card_body(
+      p("This tool normalizes raw product names by mapping them to standardized product names using an alias database."),
+      tags$ul(
+        tags$li(strong("Mapped products:"), " Direct matches found in the alias database"),
+        tags$li(strong("Fuzzy join products:"), " Similar matches found using string distance algorithms (editable)"),
+        tags$li(strong("Unmapped products:"), " No suitable matches found (editable)")
+      ),
+      p("Upload your raw product CSV file to begin the normalization process.", 
+        class = "text-muted fst-italic mb-0")
+    )
   ),
+  
+  fileInput("raw_file", "Upload 'raw_product.csv' file", accept = ".csv"),
+  uiOutput("file_warning"),
+  tags$hr(),
+  downloadButton("download_cleaned", "Download mapped products", class = "btn-light"),
+  br(),
+  downloadButton("download_likely_valid", "Download fuzzyjoin products", class = "btn-light"),
+  br(),
+  downloadButton("download_unmatched", "Download unmapped products", class = "btn-light")
+),
 
   navs_tab_card(
     nav_panel("Mapped products", DTOutput("cleaned_table")),
